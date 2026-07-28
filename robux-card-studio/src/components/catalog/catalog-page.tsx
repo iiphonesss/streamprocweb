@@ -26,6 +26,8 @@ export function CatalogPage() {
   const [brand, setBrand] = useState("");
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
+  const [syncingMarket, setSyncingMarket] = useState(false);
+  const [marketConfigured, setMarketConfigured] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function load(params?: { q?: string; brand?: string }) {
@@ -42,6 +44,10 @@ export function CatalogPage() {
 
   useEffect(() => {
     void load();
+    void fetch("/api/catalog/sync-market")
+      .then((r) => r.json())
+      .then((d) => setMarketConfigured(Boolean(d.configured)))
+      .catch(() => setMarketConfigured(false));
   }, []);
 
   const filteredHint = useMemo(
@@ -71,19 +77,73 @@ export function CatalogPage() {
     }
   }
 
+  async function syncMarketDb() {
+    setSyncingMarket(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/catalog/sync-market", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(
+          data.error ||
+            data.hint ||
+            "Не удалось синхронизировать market DB"
+        );
+      }
+      setMessage(
+        `Market DB (read-only): +${data.imported}, обновлено ${data.updated}, всего ${data.total}`
+      );
+      await load({ q, brand });
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Market sync error");
+    } finally {
+      setSyncingMarket(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 py-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-white">Каталог</h1>
           <p className="text-sm text-slate-400">
-            Импорт catalog.json → выбор товара → оцифровка
+            Импорт catalog.json или read-only sync из market DB → оцифровка
           </p>
         </div>
-        <Button disabled={importing} onClick={importCatalog}>
-          {importing ? "Импорт…" : "Импортировать catalog.json"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            disabled={syncingMarket}
+            onClick={syncMarketDb}
+            title={
+              marketConfigured
+                ? "SELECT из market DB → локальный SQLite"
+                : "Сначала задайте MARKET_DATABASE_URL в .env.local"
+            }
+          >
+            {syncingMarket
+              ? "Синхронизация…"
+              : marketConfigured
+                ? "Загрузить из market DB"
+                : "Market DB не настроена"}
+          </Button>
+          <Button disabled={importing} onClick={importCatalog}>
+            {importing ? "Импорт…" : "Импортировать catalog.json"}
+          </Button>
+        </div>
       </div>
+      {!marketConfigured && (
+        <div className="rounded-md border border-amber-800/60 bg-amber-950/30 px-4 py-3 text-sm text-amber-100">
+          Чтобы подтянуть карточки из вашей БД (только чтение), добавьте в{" "}
+          <code className="text-amber-200">.env.local</code>:
+          <pre className="mt-2 overflow-x-auto rounded bg-black/40 p-2 text-xs text-amber-50">{`MARKET_DATABASE_URL=postgresql://USER:PASS@HOST:5432/DB?sslmode=require`}</pre>
+          Production не изменяется — только SELECT, запись только в локальный SQLite Card Studio.
+        </div>
+      )}
 
       {message && (
         <div className="rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm text-slate-200">

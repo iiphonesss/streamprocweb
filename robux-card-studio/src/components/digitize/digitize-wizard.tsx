@@ -475,13 +475,13 @@ export function DigitizeWizard({ sku }: { sku: string }) {
         </Card>
       )}
 
-      {step === 2 && masks && dig.originalPath && (
+      {step === 2 && masks && (dig.originalPath || product.images[0]) && (
         <div className="space-y-4">
           <p className="text-sm text-slate-400">
             Исправьте overlay перед платным image edit: text / variable / frame / preserve.
           </p>
           <MaskEditor
-            imageUrl={dig.originalPath}
+            imageUrl={dig.originalPath || product.images[0]}
             masks={masks}
             onChange={setMasks}
           />

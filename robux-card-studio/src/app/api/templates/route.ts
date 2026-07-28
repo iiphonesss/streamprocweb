@@ -25,10 +25,23 @@ const CreateSchema = z.object({
 });
 
 export async function GET() {
-  const templates = await prisma.cardTemplate.findMany({
-    orderBy: { updatedAt: "desc" },
-  });
-  return NextResponse.json({ templates });
+  try {
+    const templates = await prisma.cardTemplate.findMany({
+      orderBy: { updatedAt: "desc" },
+    });
+    return NextResponse.json({ templates });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to load templates";
+    console.error("[GET /api/templates]", message);
+    return NextResponse.json(
+      {
+        error: message,
+        templates: [],
+        hint: "Run: npx prisma generate && npx prisma migrate dev",
+      },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(req: Request) {

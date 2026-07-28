@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { readJson } from "@/lib/fetch-json";
 
 type Template = {
   id: string;
@@ -22,11 +23,19 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [series, setSeries] = useState("25, 50, 100");
   const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
-    const res = await fetch("/api/templates");
-    const data = await res.json();
-    setTemplates(data.templates ?? []);
+    setError(null);
+    try {
+      const res = await fetch("/api/templates");
+      const data = await readJson<{ templates?: Template[]; error?: string }>(res);
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setTemplates(data.templates ?? []);
+    } catch (e) {
+      setTemplates([]);
+      setError(e instanceof Error ? e.message : "Ошибка загрузки шаблонов");
+    }
   }
 
   useEffect(() => {
@@ -49,7 +58,7 @@ export default function TemplatesPage() {
           productSku: sku,
         }),
       });
-      const data = await res.json();
+      const data = await readJson<{ error?: string; count?: number }>(res);
       if (!res.ok) throw new Error(data.error || "Failed");
       alert(`Создано ${data.count} карточек`);
     } catch (e) {
@@ -67,6 +76,12 @@ export default function TemplatesPage() {
           Сохранённые основы для серий номиналов без повторного AI
         </p>
       </div>
+
+      {error && (
+        <div className="rounded-md border border-rose-800 bg-rose-950/40 px-4 py-2 text-sm text-rose-100">
+          {error}
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         <span className="text-sm text-slate-400">Номиналы по умолчанию:</span>

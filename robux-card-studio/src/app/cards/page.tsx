@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { readJson } from "@/lib/fetch-json";
 
 type CardRow = {
   id: string;
@@ -17,11 +18,20 @@ type CardRow = {
 
 export default function CardsPage() {
   const [cards, setCards] = useState<CardRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void fetch("/api/cards")
-      .then((r) => r.json())
-      .then((d) => setCards(d.cards ?? []));
+    void (async () => {
+      try {
+        const res = await fetch("/api/cards");
+        const d = await readJson<{ cards?: CardRow[]; error?: string }>(res);
+        if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+        setCards(d.cards ?? []);
+      } catch (e) {
+        setCards([]);
+        setError(e instanceof Error ? e.message : "Ошибка загрузки");
+      }
+    })();
   }, []);
 
   return (
@@ -32,6 +42,12 @@ export default function CardsPage() {
           Draft WebP 1024×1536 quality 90 · без автопубликации
         </p>
       </div>
+
+      {error && (
+        <div className="rounded-md border border-rose-800 bg-rose-950/40 px-4 py-2 text-sm text-rose-100">
+          {error}
+        </div>
+      )}
 
       {cards.length === 0 ? (
         <Card>

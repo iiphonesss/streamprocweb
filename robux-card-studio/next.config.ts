@@ -1,12 +1,18 @@
 import type { NextConfig } from "next";
-import path from "path";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["sharp", "better-sqlite3", "@prisma/client", "pg"],
+  serverExternalPackages: [
+    "sharp",
+    "better-sqlite3",
+    "@prisma/client",
+    "pg",
+    "@prisma/adapter-better-sqlite3",
+  ],
   allowedDevOrigins: ["*.loca.lt", "loca.lt"],
+  // When running `npm run dev` from robux-card-studio, cwd is the app root.
+  // Prevents Turbopack from picking ~/package-lock.json as monorepo root.
   turbopack: {
-    // Pin root to this app so ~/package-lock.json is ignored
-    root: path.resolve(__dirname),
+    root: process.cwd(),
   },
   images: {
     remotePatterns: [

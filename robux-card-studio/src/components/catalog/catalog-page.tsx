@@ -19,6 +19,22 @@ type Product = {
   isActive: boolean;
 };
 
+async function readJson<T = Record<string, unknown>>(res: Response): Promise<T> {
+  const text = await res.text();
+  if (!text) {
+    throw new Error(
+      `Пустой ответ ${res.status} от ${res.url || "API"}. Откройте /api/health`
+    );
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(
+      `Не JSON (${res.status}): ${text.slice(0, 160)}. Выполните: npx prisma generate && npx prisma migrate dev`
+    );
+  }
+}
+
 export function CatalogPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
@@ -32,20 +48,36 @@ export function CatalogPage() {
 
   async function load(params?: { q?: string; brand?: string }) {
     setLoading(true);
-    const sp = new URLSearchParams();
-    if (params?.q) sp.set("q", params.q);
-    if (params?.brand) sp.set("brand", params.brand);
-    const res = await fetch(`/api/catalog/products?${sp.toString()}`);
-    const data = await res.json();
-    setProducts(data.products ?? []);
-    setBrands(data.brands ?? []);
-    setLoading(false);
+    setMessage(null);
+    try {
+      const sp = new URLSearchParams();
+      if (params?.q) sp.set("q", params.q);
+      if (params?.brand) sp.set("brand", params.brand);
+      const res = await fetch(`/api/catalog/products?${sp.toString()}`);
+      const data = await readJson<{
+        products?: Product[];
+        brands?: string[];
+        error?: string;
+        hint?: string;
+      }>(res);
+      if (!res.ok) {
+        throw new Error(data.error || data.hint || `HTTP ${res.status}`);
+      }
+      setProducts(data.products ?? []);
+      setBrands(data.brands ?? []);
+    } catch (e) {
+      setProducts([]);
+      setBrands([]);
+      setMessage(e instanceof Error ? e.message : "Ошибка загрузки каталога");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
     void load();
     void fetch("/api/catalog/sync-market")
-      .then((r) => r.json())
+      .then((r) => readJson<{ configured?: boolean }>(r))
       .then((d) => setMarketConfigured(Boolean(d.configured)))
       .catch(() => setMarketConfigured(false));
   }, []);
@@ -64,7 +96,12 @@ export function CatalogPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: "data/catalog.json" }),
       });
-      const data = await res.json();
+      const data = await readJson<{
+        error?: string;
+        imported?: number;
+        updated?: number;
+        total?: number;
+      }>(res);
       if (!res.ok) throw new Error(data.error || "Import failed");
       setMessage(
         `Импорт: +${data.imported}, обновлено ${data.updated}, всего ${data.total}`
@@ -86,12 +123,16 @@ export function CatalogPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ confirm: true }),
       });
-      const data = await res.json();
+      const data = await readJson<{
+        error?: string;
+        hint?: string;
+        imported?: number;
+        updated?: number;
+        total?: number;
+      }>(res);
       if (!res.ok) {
         throw new Error(
-          data.error ||
-            data.hint ||
-            "Не удалось синхронизировать market DB"
+          data.error || data.hint || "Не удалось синхронизировать market DB"
         );
       }
       setMessage(
@@ -140,7 +181,7 @@ export function CatalogPage() {
         <div className="rounded-md border border-amber-800/60 bg-amber-950/30 px-4 py-3 text-sm text-amber-100">
           Чтобы подтянуть карточки из вашей БД (только чтение), добавьте в{" "}
           <code className="text-amber-200">.env.local</code>:
-          <pre className="mt-2 overflow-x-auto rounded bg-black/40 p-2 text-xs text-amber-50">{`MARKET_DATABASE_URL=postgresql://USER:PASS@HOST:5432/DB?sslmode=require`}</pre>
+          <pre className="mt-2 overflow-x-auto rounded bg-black/40 p-2 text-xs text-amber-50">{`MARKET_DATABASE_URL=postgresql://postgres:postgres@localhost:5440/robux_market_admin`}</pre>
           Production не изменяется — только SELECT, запись только в локальный SQLite Card Studio.
         </div>
       )}
@@ -170,10 +211,7 @@ export function CatalogPage() {
             </option>
           ))}
         </select>
-        <Button
-          variant="secondary"
-          onClick={() => load({ q, brand })}
-        >
+        <Button variant="secondary" onClick={() => load({ q, brand })}>
           Найти
         </Button>
         <span className="self-center text-xs text-slate-500">{filteredHint}</span>
@@ -184,7 +222,8 @@ export function CatalogPage() {
       ) : products.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-slate-400">
-            Каталог пуст. Нажмите «Импортировать catalog.json».
+            Каталог пуст. Нажмите «Импортировать catalog.json» или «Загрузить из
+            market DB».
           </CardContent>
         </Card>
       ) : (

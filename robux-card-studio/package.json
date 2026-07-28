@@ -3,14 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "prisma generate && next dev",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
-    "studio": "prisma studio"
+    "db:reset": "prisma migrate reset --force",
+    "studio": "prisma studio",
+    "setup": "prisma generate && prisma migrate dev"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.9.1",

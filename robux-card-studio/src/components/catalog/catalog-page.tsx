@@ -21,22 +21,6 @@ type Product = {
   isActive: boolean;
 };
 
-async function readJson<T = Record<string, unknown>>(res: Response): Promise<T> {
-  const text = await res.text();
-  if (!text) {
-    throw new Error(
-      `Пустой ответ ${res.status} от ${res.url || "API"}. Откройте /api/health`
-    );
-  }
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    throw new Error(
-      `Не JSON (${res.status}): ${text.slice(0, 160)}. Выполните: npx prisma generate && npx prisma migrate dev`
-    );
-  }
-}
-
 export function CatalogPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [brands, setBrands] = useState<string[]>([]);

@@ -241,9 +241,12 @@ export function CatalogPage() {
                   {p.brand ?? "—"} · {p.faceValue ?? "—"} {p.faceCurrency ?? ""}
                 </div>
                 <Badge>{p.statusLabel}</Badge>
-                <Button asChild className="w-full">
-                  <Link href={`/digitize/${p.sku}`}>Оцифровать карточку</Link>
-                </Button>
+                <Link
+                  href={`/digitize/${encodeURIComponent(p.sku)}`}
+                  className="inline-flex h-10 w-full items-center justify-center rounded-md bg-sky-600 px-4 text-sm font-medium text-white hover:bg-sky-500"
+                >
+                  Оцифровать карточку
+                </Link>
               </CardContent>
             </Card>
           ))}

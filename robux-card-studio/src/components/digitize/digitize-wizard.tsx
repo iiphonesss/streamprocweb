@@ -90,21 +90,47 @@ export function DigitizeWizard({ sku }: { sku: string }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/digitization/${sku}`);
-      const data = await res.json();
+      const res = await fetch(`/api/digitization/${encodeURIComponent(sku)}`);
+      const text = await res.text();
+      if (!text) {
+        throw new Error(
+          `Пустой ответ API (${res.status}). Проверьте /api/health и перезапустите npm run dev`
+        );
+      }
+      const data = JSON.parse(text) as {
+        error?: string;
+        warning?: string | null;
+        imageError?: string | null;
+        product?: {
+          sku: string;
+          name: string;
+          brand?: string | null;
+          faceValue?: number | null;
+          faceCurrency?: string | null;
+          images: string[];
+        };
+        digitization?: Digitization;
+        aiMode?: "real" | "mock";
+      };
       if (!res.ok) throw new Error(data.error || "Load failed");
+      if (!data.product || !data.digitization) {
+        throw new Error("API вернул неполные данные оцифровки");
+      }
       setProduct(data.product);
       setDig(data.digitization);
-      setAiMode(data.aiMode);
-      setMasks(data.digitization.masksJson);
-      setSummary(data.digitization.analysisSummaryJson);
-      setFrame(data.digitization.frameAnalysisJson);
+      setAiMode(data.aiMode ?? "mock");
+      setMasks(data.digitization.masksJson ?? null);
+      setSummary(data.digitization.analysisSummaryJson ?? null);
+      setFrame(data.digitization.frameAnalysisJson ?? null);
       setRegions(data.digitization.textRegionsJson ?? []);
       if (data.digitization.selectedBaseMode) {
-        setBaseMode(data.digitization.selectedBaseMode);
+        setBaseMode(data.digitization.selectedBaseMode as BaseMode);
       }
       setTemplateName(`${data.product.sku} template`);
+      if (data.warning) setError(data.warning);
     } catch (e) {
+      setProduct(null);
+      setDig(null);
       setError(e instanceof Error ? e.message : "Error");
     } finally {
       setLoading(false);
